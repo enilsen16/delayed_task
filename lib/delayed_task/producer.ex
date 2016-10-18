@@ -8,7 +8,7 @@ defmodule DelayedTask.Producer do
   # Callbacks
 
   def init(counter) do
-    {:producer, counter}
+    {:producer, counter, dispatcher: Experimental.GenStage.BroadcastDispatcher}
   end
 
   def handle_demand(demand, state) do
