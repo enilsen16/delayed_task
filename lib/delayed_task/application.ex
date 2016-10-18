@@ -13,14 +13,17 @@ defmodule DelayedTask.Application do
       # Starts a worker by calling: DelayedTask.Worker.start_link(arg1, arg2, arg3)
       # worker(DelayedTask.Worker, [arg1, arg2, arg3]),
       supervisor(DelayedTask.Repo, []),
-      worker(DelayedTask.Producer, []),
-      worker(DelayedTask.Consumer, [])
-
+      worker(DelayedTask.Producer, [])
     ]
+
+    consumers =
+      for id <- 1..(System.schedulers_online * 4) do
+        worker(DelayedTask.Consumer, [], id: id)
+      end
 
     # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: DelayedTask.Supervisor]
-    Supervisor.start_link(children, opts)
+    Supervisor.start_link(children ++ consumers, opts)
   end
 end
