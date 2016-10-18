@@ -17,7 +17,7 @@ defmodule DelayedTask.Application do
     ]
 
     consumers =
-      for id <- 1..(System.schedulers_online * 4) do
+      for id <- 1..1 do
         worker(DelayedTask.Consumer, [], id: id)
       end
 
@@ -25,5 +25,13 @@ defmodule DelayedTask.Application do
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: DelayedTask.Supervisor]
     Supervisor.start_link(children ++ consumers, opts)
+  end
+
+  def start_later(module, function, args) do
+    payload = {module, function, args} |> :erlang.term_to_binary
+    DelayedTask.Repo.insert_all "tasks", [
+      %{status: "waiting", payload: payload}
+    ]
+    send DelayedTask.Producer, :yo_you_have_data
   end
 end
