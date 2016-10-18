@@ -8,7 +8,7 @@ defmodule DelayedTask.Consumer do
   # Callbacks
 
   def init(state) do
-    {:consumer, state, subscribe_to: [DelayedTask.Producer]}
+    {:consumer, state, subscribe_to: [{DelayedTask.Producer, min_demand: 50, max_demand: 100}]}
   end
 
   def handle_events(events, _from, state) do
