@@ -1,11 +1,16 @@
 defmodule DelayedTask.Producer do
   use Experimental.GenStage
 
-  import Ecto.Query
-  import DelayedTask.Repo
+  @name __MODULE__
 
   def start_link do
-    Experimental.GenStage.start_link(__MODULE__, 0, name: __MODULE__)
+    Experimental.GenStage.start_link(__MODULE__, 0, name: @name)
+  end
+
+  def enqueue(module, function, args) do
+    DelayedTask.Task.enqueue("waiting", :erlang.term_to_binary({module, function, args}))
+    Process.send(@name, :enqueued, [])
+    :ok
   end
 
   # Callbacks
@@ -14,36 +19,26 @@ defmodule DelayedTask.Producer do
     {:producer, counter}
   end
 
-  def handle_demand(demand, state) when demand > 0 do
-    limit = demand + state
-    {:ok, {count, events}} = take(limit)
-    {:noreply, events, limit - count}
+  def handle_cast(:enqueued, state) do
+    serve_jobs(state)
+  end
+
+  def handle_demand(demand, state) do
+    serve_jobs(demand + state)
   end
 
   def handle_info(:yo_you_have_data, state) do
-    {:ok, {count, events}} = take(state)
+    {count, events} = DelayedTask.Task.take(state)
     {:noreply, events, state - count}
   end
 
-  defp take(limit) do
-    DelayedTask.Repo.transaction fn ->
-      ids = DelayedTask.Repo.all waiting(limit)
-      {count, events} = DelayedTask.Repo.update_all by_ids(ids),
-                                        [set: [status: "running"]],
-                                        [returning: [:id, :payload]]
-      {count, events}
-    end
+  defp serve_jobs(0) do
+    {:noreply, [], 0}
   end
 
-  defp by_ids(ids) do
-    from t in "tasks", where: t.id in ^ids
-  end
-
-  defp waiting(limit) do
-    from t in "tasks",
-      where: t.status == "waiting",
-      limit: ^limit,
-      select: t.id,
-      lock: "FOR UPDATE SKIP LOCKED"
+  defp serve_jobs(limit) when limit > 0 do
+    {count, events} = DelayedTask.Task.take(limit)
+    Process.send_after(@name, :enqueued, 60_000)
+    {:noreply, events, limit - count}
   end
 end

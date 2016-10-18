@@ -13,11 +13,12 @@ defmodule DelayedTask.Application do
       # Starts a worker by calling: DelayedTask.Worker.start_link(arg1, arg2, arg3)
       # worker(DelayedTask.Worker, [arg1, arg2, arg3]),
       supervisor(DelayedTask.Repo, []),
-      worker(DelayedTask.Producer, [])
+      worker(DelayedTask.Producer, []),
+      supervisor(Task.Supervisor, [[name: DelayedTask.TaskSupervisor]])
     ]
 
     consumers =
-      for id <- 1..1 do
+      for id <- 1..System.schedulers_online * 2 do
         worker(DelayedTask.Consumer, [], id: id)
       end
 
@@ -34,4 +35,6 @@ defmodule DelayedTask.Application do
     ]
     send DelayedTask.Producer, :yo_you_have_data
   end
+
+  defdelegate enqueue(module, function, args), to: DelayedTask.Producer
 end
